@@ -1,64 +1,65 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import OpenAI from 'openai';
-import { prisma } from '@/lib/db';
+import { prisma } from "@/lib/db";
+import { currentUser } from "@clerk/nextjs/server";
+import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
+import { json } from "stream/consumers";
 
-// Initialize OpenRouter client
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
   apiKey: process.env.OPENROUTER_API_KEY,
 });
+export async function GET(request: NextRequest){
+    try {
 
-// This API analyzes user's expenses and generates AI insights
-export async function GET(request: NextRequest) {
-  try {
-    // Get the current user's ID from Clerk
-    const { userId } = await auth();
-
-    if (!userId) {
-      console.log('No userId found');
-      return NextResponse.json(
-        { error: 'Unauthorized - Please login' },
-        { status: 401 }
-      );
+      const user = await currentUser()
+     if (!user) {
+   return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-
-    console.log('Fetching insights for user:', userId);
 
     // Fetch user's recent expenses (last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+
+    const thirtyDaysAgo  = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30) 
 
     const records = await prisma.record.findMany({
-      where: {
-        userId: userId,
-        date: {
-          gte: thirtyDaysAgo, // Greater than or equal to 30 days ago
+        where:{userId:user.id,
+
+          date  : {
+             gte: thirtyDaysAgo,
+          } 
+
         },
-      },
-      orderBy: {
+         orderBy: {
         date: 'desc',
       },
-    });
+       
+    })
 
     // If no expenses, return empty insights
-    if (records.length === 0) {
-      return NextResponse.json({
+
+
+    if(records.length === 0) {
+        return NextResponse.json({
         insights: [],
         message: 'No expenses to analyze'
-      });
+        })
     }
 
-    // Prepare expense summary for AI
-    const expenseSummary = prepareExpenseSummary(records);
+
+      // Prepare expense summary for AI
+
+      const expenseSummary = prepareExpenseSummary(records)
+
 
     // Call AI to generate insights
+
     const completion = await openai.chat.completions.create({
       model: "meta-llama/llama-3.2-3b-instruct:free",
       messages: [
         {
-          role: "system",
-          content: `You are a financial advisor AI. Analyze the user's spending data and provide 3-4 actionable insights. 
+     role: "system",
+    content: `You are a financial advisor AI. Analyze the user's spending data and provide 3-4 actionable insights. 
 
 For each insight, provide:
 1. category: The spending category (e.g., "Shopping", "Transportation", "Food & Dining")
@@ -87,71 +88,82 @@ Respond ONLY with a valid JSON array. Example format:
       max_tokens: 800
     });
 
-    // Parse AI response
-    const aiResponse = completion.choices[0]?.message?.content?.trim() || '[]';
-    
-    let insights;
+
+    const aiResponse = completion.choices[0]?.message?.content?.trim() || '[]'
+
+    let insights
+
+
     try {
-      insights = JSON.parse(aiResponse);
+        insights = JSON.parse(aiResponse)
     } catch (parseError) {
-      // If AI doesn't return valid JSON, provide fallback insights
-      insights = generateFallbackInsights(records);
+      // If AI doesn't return valid JSON, provide fallback insights    
+
+    insights = generateFallbackInsights(records);
     }
 
-    // Add unique IDs to insights
-    insights = insights.map((insight: any, index: number) => ({
-      id: `insight-${index}`,
-      ...insight
-    }));
 
-    return NextResponse.json({
-      insights,
-      message: 'Insights generated successfully'
-    });
 
-  } catch (error) {
-    console.error('Error generating AI insights:', error);
-    return NextResponse.json(
-      { error: 'Failed to generate insights' },
-      { status: 500 }
-    );
-  }
+
+return NextResponse.json({
+     insights,
+    message: "Insights generated successfully"
+})
+
+    }catch(error){
+        console.error("Error generating AI insights",error)
+     NextResponse.json({
+        error: 'Failed to generate insights' 
+     }, {status:500})   
+    }
 }
 
-// Helper function to prepare expense summary for AI
-function prepareExpenseSummary(records: any[]) {
-  // Calculate totals by category
-  const categoryTotals: { [key: string]: number } = {};
-  
-  records.forEach(record => {
-    if (categoryTotals[record.category]) {
-      categoryTotals[record.category] += record.amount;
-    } else {
-      categoryTotals[record.category] = record.amount;
-    }
-  });
 
-  // Calculate total spending
-  const totalSpending = records.reduce((sum, r) => sum + r.amount, 0);
+   // Helper function to prepare expense summary for AI
+   
+   function prepareExpenseSummary(records:any[]){
+     // Calculate totals by category
 
-  // Find highest expenses
-  const sortedRecords = [...records].sort((a, b) => b.amount - a.amount).slice(0, 5);
+     const categoryTotals : {[key: string]: number} = {}
 
-  return `
-Total Expenses: ${records.length} transactions
-Total Amount: $${totalSpending.toFixed(2)}
+     records.forEach(record => {
 
-Spending by Category:
+        if(categoryTotals[record.category])  {
+         categoryTotals[record.category] += record.amount;  
+        
+     }else{
+
+      categoryTotals[record.category] = record.amount;    
+    
+        }
+    })
+     // Calculate total spending
+
+
+     const totalSpending = records.reduce((sum,r) => sum + r.amount, 0)
+
+     // Find highest expenses
+
+     const sortedRecords = [...records].sort((a,b)=>  b.amount - a.amount).slice(0, 5)
+
+
+   return `
+  Total Expenses: ${records.length} transactions
+
+ Total Amount: ${totalSpending.toFixed(2)}
+
+
+ Spending by Category:
 ${Object.entries(categoryTotals)
   .map(([cat, amount]) => `- ${cat}: $${amount.toFixed(2)} (${((amount / totalSpending) * 100).toFixed(1)}%)`)
   .join('\n')}
 
 Top 5 Expenses:
 ${sortedRecords.map(r => `- $${r.amount.toFixed(2)} on ${r.text} (${r.category})`).join('\n')}
-`;
-}
 
-// Fallback insights if AI fails
+  `
+   }
+
 function generateFallbackInsights(records: any[]) {
   const insights = [];
   
@@ -186,3 +198,9 @@ function generateFallbackInsights(records: any[]) {
 
   return insights;
 }
+ 
+   
+    
+                
+        
+   
