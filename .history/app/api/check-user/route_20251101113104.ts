@@ -1,5 +1,3 @@
-export const runtime = "nodejs";
-
 import { prisma } from "@/lib/db";
 import { currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
