@@ -46,3 +46,19 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
+```
+
+## 7. Get the correct Neon connection strings
+
+In your Neon dashboard:
+
+1. Go to your project
+2. Click **Connection Details**
+3. Copy **both**:
+   - `DATABASE_URL` (for Prisma Migrate)
+   - `DIRECT_URL` (for Prisma Client)
+
+Add to Vercel:
+```
+DATABASE_URL=postgresql://user:pass@host/db?sslmode=require&pgbouncer=true
+DIRECT_URL=postgresql://user:pass@host/db?sslmode=require

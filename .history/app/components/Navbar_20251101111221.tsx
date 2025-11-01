@@ -11,29 +11,29 @@ function Navbar() {
 
     const {user} = useUser()
 
-    useEffect(() => {
-  const checkUser = async () => {
-    try {
-      const res = await fetch("/api/check-user", {
-        method: "GET",
-      });
+    useEffect(()=> {
+       const checkUser  = async() => {
+        try {
+            const res = await fetch("/api/check-user", {
+                method:"GET",
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Failed to check user:", errorText);
-        return;
-      }
+            })
 
-      const data = await res.json();
-      console.log("User check success:", data);
-      
-    } catch (error) {
-      console.error("Error calling check-user:", error);
-    }
-  };
+           const data = await res.json();
 
-  if (user) checkUser();
-}, [user]);
+            if(!res.ok){
+              console.error(" Failed to check or create user",data);
+            }else{
+               console.log(" User check success",data);   
+            }
+
+        } catch (error) {
+       console.error(" Error calling check-user:", error);      
+        }
+       }
+
+       if (user) checkUser()
+    },[user])
   return (
     <div className='w-full bg-white shadow-md py-3 px-6 flex justify-between items-center'>
         <Image src="/logo.png" alt='logo' width={120} height={120}/>
