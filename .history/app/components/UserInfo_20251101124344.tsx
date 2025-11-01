@@ -32,7 +32,24 @@ function UserInfo() {
           </p>
         </div>
 
-       
+        {/* createdAt */}
+        <div className="border w-[170px] mt-3 bg-green-50 border-green-700 rounded-md p-2.5 text-center">
+          {createdAt ? (
+           <p className="text-green-800 text-sm font-medium">
+  Member since:{' '}
+  {createdAt
+    ? new Date(createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    : 'Loading...'}
+</p>
+
+          ) : (
+            <p className="text-gray-500 text-sm">Loading account info...</p>
+          )}
+        </div>
       </div>
     </div>
   )
